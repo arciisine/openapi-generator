@@ -28,11 +28,10 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
+
+import org.apache.commons.lang3.StringUtils;
+import org.openapitools.codegen.*;
 import java.nio.file.*;
-import org.openapitools.codegen.ClientOptInput;
-import org.openapitools.codegen.CodegenConstants;
-import org.openapitools.codegen.DefaultGenerator;
-import org.openapitools.codegen.GeneratorNotFoundException;
 import org.openapitools.codegen.config.CodegenConfigurator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -315,9 +314,6 @@ public class Generate extends OpenApiGeneratorCommand {
     }
 
     public void generate() {
-        // attempt to read from config file
-        CodegenConfigurator configurator = CodegenConfigurator.fromFile(configFile);
-
         // if a config file wasn't specified or we were unable to read it
         if (configurator == null) {
             if (configFile != null && configFile.length() > 0) {
