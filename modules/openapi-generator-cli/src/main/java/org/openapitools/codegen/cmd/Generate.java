@@ -31,6 +31,7 @@ import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
 import org.openapitools.codegen.*;
+import java.nio.file.*;
 import org.openapitools.codegen.config.CodegenConfigurator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,6 +57,10 @@ public class Generate extends OpenApiGeneratorCommand {
     @Option(name = {"-i", "--input-spec"}, title = "spec file",
             description = "location of the OpenAPI spec, as URL or file (required if not loaded via config using -c)")
     private String spec;
+
+    @Option(name = { "-w", "--watch" }, title = "watch mode", 
+            description = "enable watch mode for generation (false by default)")
+    private boolean watch = false;
 
     @Option(name = {"-t", "--template-dir"}, title = "template directory",
             description = "folder containing the template files")
@@ -264,8 +269,57 @@ public class Generate extends OpenApiGeneratorCommand {
                     .map(root -> root.getAppender("STDERR"))
                     .ifPresent(FilterAttachable::clearAllFilters);
         }
+       
 
-        // this initial check allows for field-level package private injection (for unit testing)
+        if (watch) {
+            generateAndWatch();
+        } else {
+            generate();
+        }
+    }
+
+    public void generateAndWatch() {
+        try {
+            generate();
+        } catch (Exception e) {
+            // Ignore
+        }
+
+        try {
+            final Path filePath = FileSystems.getDefault().getPath(spec);
+            final Path path = filePath.getParent();
+            try (final WatchService watchService = FileSystems.getDefault().newWatchService()) {
+                final WatchKey watchKey = path.register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);
+                while (true) {
+                    final WatchKey wk = watchService.take();
+                    for (WatchEvent<?> event : wk.pollEvents()) {
+                        //we only register "ENTRY_MODIFY" so the context is always a Path.
+                        final Path changed = (Path) event.context();
+                        System.out.println(changed);
+                        if (changed.endsWith(filePath.getFileName())) {
+                            System.out.println("My file has changed");
+                            try {
+                                generate();
+                            } catch (Exception e) {
+                                // Ignore
+                            }
+                        }
+                    }
+                    // reset the key
+                    boolean valid = wk.reset();
+                    if (!valid) {
+                        System.out.println("Key has been unregistered");
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+
+    public void generate() {
+        // if a config file wasn't specified or we were unable to read it
         if (configurator == null) {
             if (configFile != null && configFile.length() > 0) {
                 // attempt to load from configFile
